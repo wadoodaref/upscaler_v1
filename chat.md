@@ -137,3 +137,6 @@ Find verified ONNX sources for extra models, download and validate them, wire mo
    - Ran `.\build_portable.ps1 -Clean`.
    - Executable `--selftest` verified all 6 models on both DirectML and CPU (12 test runs) plus face restoration; all passed.
    - Packaged into `E:\projects\1output\UPSCALER_V1_PORTABLE` (853 MB, launcher: `Upscaler 1.exe`).
+
+### Commit
+- `bfb20ae`
