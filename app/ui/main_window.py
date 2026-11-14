@@ -108,6 +108,10 @@ class UpscaleWorker(QThread):
 
                 self.signals.job_finished.emit(job, result_bgr)
 
+            except InterruptedError:
+                job.status = "Cancelled"
+                break
+
             except Exception as e:
                 log.exception("Error processing %s", job.input_path)
                 job.status = "Error"
@@ -214,11 +218,15 @@ class MainWindow(QMainWindow):
         mod_form.setSpacing(8)
 
         self.combo_model = QComboBox()
+        # Offline app: only offer models whose weights are actually on disk.
+        # A listed-but-missing model would silently run as plain Lanczos.
         for m in registry.MODELS:
-            self.combo_model.addItem(f"{m.name} ({m.scale}x)", m.id)
+            if registry.is_model_installed(m, MODELS_DIR):
+                self.combo_model.addItem(f"{m.name} ({m.scale}x)", m.id)
         # Select current model
         idx = max(0, self.combo_model.findData(self.settings.model))
         self.combo_model.setCurrentIndex(idx)
+        self.settings.model = self.combo_model.itemData(idx)
         self.combo_model.currentIndexChanged.connect(self._on_model_changed)
         mod_form.addRow("Model:", self.combo_model)
 
@@ -365,12 +373,14 @@ class MainWindow(QMainWindow):
 
     def _update_face_restorer_ui(self) -> None:
         if self.pipeline.restorer.is_available:
-            self.lbl_face_status.setText("GFPGAN v1.4 detected & ready.")
+            self.lbl_face_status.setText("Face detector + GFPGAN v1.4 ready.")
             self.lbl_face_status.setStyleSheet(f"color: {theme.OK};")
             self.chk_face_restore.setEnabled(True)
         else:
-            self.lbl_face_status.setText("GFPGAN model not found. Place in models/ folder.")
+            missing = ", ".join(self.pipeline.restorer.missing)
+            self.lbl_face_status.setText(f"Missing in models folder: {missing}")
             self.lbl_face_status.setStyleSheet(f"color: {theme.WARN};")
+            self.chk_face_restore.setEnabled(False)
 
     # -- User Event Handlers -------------------------------------------------
 
@@ -580,7 +590,15 @@ class MainWindow(QMainWindow):
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)
         self.progress_bar.setValue(100)
-        self.lbl_status.setText("All upscaling completed successfully!")
+        failed = sum(1 for j in self.queue_jobs if j.status == "Error")
+        cancelled = sum(1 for j in self.queue_jobs if j.status == "Cancelled")
+        if failed:
+            self.lbl_status.setText(f"Finished with {failed} failed image(s) - see upscaler.log")
+        elif cancelled:
+            self.lbl_status.setText("Stopped.")
+        else:
+            self.lbl_status.setText("All upscaling completed successfully!")
+        self._sync_queue_view()
         self.worker = None
 
     def _on_worker_error(self, err_msg: str) -> None:

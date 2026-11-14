@@ -22,6 +22,7 @@ output/
 *.log
 settings.json
 startup_error.log
+selftest.json
 
 # --- os / editor -----------------------------------------------------------
 Thumbs.db

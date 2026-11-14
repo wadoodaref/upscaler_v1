@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -12,7 +13,19 @@ log = logging.getLogger(__name__)
 APP_NAME = "Image Upscaler v1"
 APP_VERSION = "1.0.0"
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+
+def _resolve_root() -> Path:
+    """Folder that holds models/, output/ and settings.json.
+
+    Frozen (portable) build: the folder of the exe, so the whole app travels
+    as one folder and never touches anything outside it. Source run: repo root.
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent.parent
+
+
+ROOT = _resolve_root()
 MODELS_DIR = ROOT / "models"
 OUTPUT_DIR = ROOT / "output"
 SETTINGS_FILE = ROOT / "settings.json"
@@ -48,7 +61,14 @@ class Settings:
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+            s = cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+            # A portable folder gets copied between PCs and drives, so the
+            # absolute paths saved on the last machine may not exist here.
+            if not Path(s.output_dir).parent.is_dir():
+                s.output_dir = str(OUTPUT_DIR)
+            if not Path(s.last_input_dir).is_dir():
+                s.last_input_dir = str(ROOT)
+            return s
         except Exception as e:
             log.warning("Could not load settings from %s (%s); using defaults", SETTINGS_FILE, e)
             return cls()

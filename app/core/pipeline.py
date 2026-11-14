@@ -81,6 +81,13 @@ class UpscalePipeline:
             is_cancelled=is_cancelled,
         )
 
+        # The models are fixed 4x (or 2x) networks. When the user asks for a
+        # smaller factor, reduce the result so the size matches the request.
+        in_h, in_w = image_bgr.shape[:2]
+        want_w, want_h = in_w * self.settings.scale, in_h * self.settings.scale
+        if self.settings.scale in (2, 3, 4) and result.shape[1] > want_w:
+            result = cv2.resize(result, (want_w, want_h), interpolation=cv2.INTER_AREA)
+
         # 2. Face restoration pass if enabled
         if self.settings.face_restoration and self.restorer.is_available:
             result = self.restorer.enhance_image_faces(result, blend=self.settings.face_restorer_blend)

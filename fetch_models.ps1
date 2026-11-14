@@ -26,6 +26,19 @@ if ((Test-Path $localGfpgan) -and (-not (Test-Path $destGfpgan))) {
     Copy-Item $localGfpgan $destGfpgan
 }
 
+# 1b. Face detector (SCRFD det_10g) used by face restoration - also local
+$destDet = Join-Path $models "det_10g.onnx"
+if (-not (Test-Path $destDet)) {
+    foreach ($cand in @("E:\projects\face_swap_v2\models\det_10g.onnx",
+                        "E:\projects\face_swap_v1\models\.insightface\models\buffalo_l\det_10g.onnx")) {
+        if (Test-Path $cand) {
+            Say "Copying face detector det_10g.onnx from $cand" "Green"
+            Copy-Item $cand $destDet
+            break
+        }
+    }
+}
+
 # 2. Known model targets
 $targets = @(
     @{
