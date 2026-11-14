@@ -47,3 +47,8 @@ Create an offline desktop app to upscale pictures using Python/PySide6 with a si
 - Pipeline CPU test: Upscaled sample image 4x in under 2 seconds.
 - Model detection: `realesr-general-x4v3.onnx` and `gfpgan_1.4.onnx` verified and loaded cleanly.
 - GUI smoke test: `MainWindow` instantiated without errors.
+
+### Remote & Push
+- Created GitHub repository: `https://github.com/wadoodaref/upscaler_v1`
+- Pushed root commit `49b9bf4` to `origin/main`.
+
