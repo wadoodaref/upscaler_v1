@@ -82,3 +82,28 @@ Create an offline desktop app to upscale pictures using Python/PySide6 with a si
 - `python -m app.main --selftest`: PASSED (realesr-general-x4v3 on DirectML and CPU, fast-lanczos, fast-bicubic, face restorer).
 - Real photo (6 people, reduced to 320 px, upscaled 4x with face restoration on CPU): 6 faces detected and restored, no visible seams; 34.6 s with restoration vs 3.1 s without.
 
+### Commit
+- `ff1a04f`
+
+## Session 3 — 2026-11-14: Portable offline build (house layout, like face swap)
+
+### User Request
+Same request as session 2: make it a portable offline project like face swap.
+
+### Changes
+- `launch.py`: frozen entry point (keeps package context; writes `startup_error.log` and shows a dialog on a startup failure).
+- `upscaler.spec`: PyInstaller onedir spec; bundles ONNX Runtime DLLs, excludes the heavy packages of the shared face_swap_v1 venv and unused Qt modules.
+- `build_portable.ps1`: build -> copy models (fails if a required one is missing) -> package to `E:\projects\1output\UPSCALER_V1_PORTABLE` with only `Upscaler 1.exe` at the root and everything else in `app\` -> run the packaged exe's `--selftest` and fail the build if it does not pass. Keeps `app\settings.json` and `app\output\` across rebuilds.
+- `HANDOFF_CONTINUATION_PROMPT.md`: created (required by rules §6, was missing).
+- `README.md`, `PROJECT_PLAN.md`: portable build, model table, phases.
+
+### Decisions
+- Same layout and launcher approach as `face_swap_v1/build_portable.ps1` (C# launcher compiled with the built-in `csc.exe`).
+- PyInstaller is installed only if missing, so a rebuild needs no network.
+- Only models already on disk are bundled; nothing was downloaded. The three optional Real-ESRGAN models stay hidden in the UI until their files exist.
+
+### Verification
+- `.\build_portable.ps1 -Clean`: built, 676 MB. Packaged-exe self-test passed: realesr-general-x4v3 on DirectML and CPU, both fast modes, face restorer.
+- `Upscaler 1.exe` started from the portable: window "Image Upscaler v1 v1.0.0" opened, no `startup_error.log`, closed cleanly.
+- Not done: a click-through upscale in the portable GUI.
+

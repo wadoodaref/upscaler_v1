@@ -13,7 +13,7 @@ A modern, high-performance offline desktop application to upscale images and res
 2. **Built-in Seam Blending & Memory Tiling**:
    - Supports 200px, 256px, and 400px tiling to prevent Out Of Memory (OOM) errors on low-VRAM GPUs or systems with limited RAM.
 3. **Face Restoration Add-on**:
-   - Integrated **GFPGAN v1.4** ONNX support to automatically detect and enhance blurry faces in portraits and group photos.
+   - **SCRFD** face detection + **GFPGAN v1.4** (both ONNX): every face is found, aligned, restored and blended back with a feathered mask.
 4. **Intuitive Face Swap v1-style UI**:
    - **Interactive Before / After Split Slider**: Drag with mouse or use arrow keys (Left/Right, Home/End) to inspect fine details.
    - **Batch Queue**: Drag and drop single images or entire folders, track per-item progress, elapsed time, and ETA.
@@ -34,6 +34,38 @@ Check available hardware acceleration providers:
 ```powershell
 .\run.ps1 -Doctor
 ```
+
+### 3. Portable offline build
+```powershell
+.\build_portable.ps1
+```
+Produces `E:\projects\1output\UPSCALER_V1_PORTABLE\` (about 680 MB):
+
+```
+UPSCALER_V1_PORTABLE\
+  Upscaler 1.exe        <- the only file at the root; double-click this
+  app\                  <- Upscaler.exe, runtime, models\, output\, settings.json
+```
+
+The folder needs no Python, no installation and no internet. Copy it to any
+Windows 10/11 PC or USB stick. Model weights are bundled. The build runs the
+packaged exe's own `--selftest` (every bundled model + face restoration) and
+fails if that does not pass. A rebuild keeps `app\settings.json` and `app\output\`.
+
+### 4. Models
+Bundled and required by the build: `realesr-general-x4v3.onnx` (upscaler),
+`det_10g.onnx` (face detector), `gfpgan_1.4.onnx` (face restorer). The two
+"Fast" modes need no model. The app lists only models whose file is present in
+`models\`; to add one of the optional models below, drop the file in with this
+exact name:
+
+| File name | Model |
+|---|---|
+| `realesrgan-x4plus.onnx` | Real-ESRGAN Plus (photo) |
+| `realesrgan-x4plus-anime.onnx` | Real-ESRGAN Anime 6B |
+| `realesr-animevideov3.onnx` | Real-ESRGAN Anime Compact |
+
+`gfpgan_1.4` and `det_10g` are licensed for non-commercial use.
 
 ---
 
@@ -63,6 +95,9 @@ E:\projects\upscaler_v1\
   │   └── main.py                  # Entry point
   ├── models\                      # ONNX models storage
   ├── output\                      # Default output directory
+  ├── build_portable.ps1           # Portable offline build (PyInstaller + launcher)
+  ├── launch.py                    # Entry point for the frozen build
+  ├── upscaler.spec                # PyInstaller spec
   ├── fetch_models.ps1             # Model downloader script
   ├── requirements.txt
   └── run.ps1                      # App launcher

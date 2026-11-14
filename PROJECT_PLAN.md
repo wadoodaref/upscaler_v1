@@ -17,3 +17,17 @@ Build an offline desktop application to upscale images and restore portrait face
   - Batch queue with per-item progress, dimensions, and ETA
   - Drag-and-drop file ingestion
   - Settings persistence (`settings.json`)
+
+## Phases
+| # | Phase | Status |
+|---|---|---|
+| 1 | Scaffold: UI, engines, tiling, queue | Done (session 1) |
+| 2 | Face restoration that actually runs (SCRFD + aligned GFPGAN), `--selftest` | Done (session 2) |
+| 3 | Portable offline build in house layout, self-tested | Done (session 3) |
+| 4 | Extra bundled models (x4plus photo, anime) | Open - needs the ONNX files; awaiting user decision on downloading them |
+| 5 | NCNN-Vulkan sidecar | Open - code path exists, binary never fetched or tested |
+
+## Acceptance criteria for the portable
+- Only `Upscaler 1.exe` at the root; everything else under `app\`.
+- Runs with no Python, no install, no network; models bundled.
+- `app\Upscaler.exe --selftest` exits 0 (enforced by `build_portable.ps1`).
