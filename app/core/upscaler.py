@@ -13,7 +13,7 @@ from typing import Callable
 import cv2
 import numpy as np
 
-from .models_registry import ModelSpec, get_model
+from .models_registry import ModelSpec, get_model, resolve_model_file
 from .providers import CPU_PROVIDER, find_ncnn_executable, resolve_onnx_providers
 from .tiler import process_tiles
 
@@ -68,8 +68,8 @@ class UpscalerEngine:
         self.current_provider: str | None = None
 
     def _get_onnx_session(self, model_spec: ModelSpec, device_pref: str):
-        target_path = self.models_dir / model_spec.filename
-        if not target_path.is_file():
+        target_path = resolve_model_file(model_spec, self.models_dir)
+        if not target_path or not target_path.is_file():
             raise FileNotFoundError(
                 f"Model file '{model_spec.filename}' not found in {self.models_dir}.\n"
                 f"Please place the model in the models/ directory or choose Fast Algorithmic mode."
@@ -85,6 +85,13 @@ class UpscalerEngine:
         ):
             return self.onnx_session
 
+        # Release previous session and garbage collect GPU buffers before allocating new session
+        if self.onnx_session is not None:
+            del self.onnx_session
+            self.onnx_session = None
+            import gc
+            gc.collect()
+
         import onnxruntime as ort
 
         sess_opts = ort.SessionOptions()
@@ -99,14 +106,14 @@ class UpscalerEngine:
         log.info("Active ONNX Provider: %s", self.current_provider)
         return session
 
-    def upscale_onnx(
+    def _run_onnx_tiling(
         self,
         image: np.ndarray,
         model_spec: ModelSpec,
-        device_pref: str = "auto",
-        tile_size: int = 256,
-        progress_cb: Callable[[int, int], None] | None = None,
-        is_cancelled: Callable[[], bool] | None = None,
+        device_pref: str,
+        tile_size: int,
+        progress_cb: Callable[[int, int], None] | None,
+        is_cancelled: Callable[[], bool] | None,
     ) -> np.ndarray:
         session = self._get_onnx_session(model_spec, device_pref)
         input_name = session.get_inputs()[0].name
@@ -128,6 +135,29 @@ class UpscalerEngine:
             progress_callback=progress_cb,
             is_cancelled=is_cancelled,
         )
+
+    def upscale_onnx(
+        self,
+        image: np.ndarray,
+        model_spec: ModelSpec,
+        device_pref: str = "auto",
+        tile_size: int = 256,
+        progress_cb: Callable[[int, int], None] | None = None,
+        is_cancelled: Callable[[], bool] | None = None,
+    ) -> np.ndarray:
+        try:
+            return self._run_onnx_tiling(image, model_spec, device_pref, tile_size, progress_cb, is_cancelled)
+        except Exception as e:
+            if device_pref != "cpu":
+                log.warning("ONNX execution failed on '%s' (%s). Retrying on CPUExecutionProvider fallback...", device_pref, e)
+                if self.onnx_session is not None:
+                    del self.onnx_session
+                    self.onnx_session = None
+                    self.current_onnx_model = None
+                    import gc
+                    gc.collect()
+                return self._run_onnx_tiling(image, model_spec, "cpu", tile_size, progress_cb, is_cancelled)
+            raise
 
     def upscale_ncnn_cli(
         self,
@@ -205,9 +235,9 @@ class UpscalerEngine:
             return upscale_algorithmic(image, scale=spec.scale, method=method, progress_cb=progress_cb)
 
         # 2. Check if ONNX model is available locally
-        model_file = self.models_dir / spec.filename
-        if engine_type == "onnx" or (engine_type == "auto" and model_file.is_file()):
-            if model_file.is_file():
+        model_file = resolve_model_file(spec, self.models_dir)
+        if engine_type == "onnx" or (engine_type == "auto" and model_file is not None):
+            if model_file is not None:
                 return self.upscale_onnx(
                     image=image,
                     model_spec=spec,

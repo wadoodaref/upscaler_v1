@@ -53,17 +53,19 @@ packaged exe's own `--selftest` (every bundled model + face restoration) and
 fails if that does not pass. A rebuild keeps `app\settings.json` and `app\output\`.
 
 ### 4. Models
-Bundled and required by the build: `realesr-general-x4v3.onnx` (upscaler),
-`det_10g.onnx` (face detector), `gfpgan_1.4.onnx` (face restorer). The two
-"Fast" modes need no model. The app lists only models whose file is present in
-`models\`; to add one of the optional models below, drop the file in with this
-exact name:
+All of these are bundled and required by the build. The two "Fast" modes need
+no model. The app lists only models whose file is present in `models\`.
+`.\fetch_models.ps1` downloads the three Real-ESRGAN Plus/Anime files and
+checks their SHA-256.
 
-| File name | Model |
-|---|---|
-| `realesrgan-x4plus.onnx` | Real-ESRGAN Plus (photo) |
-| `realesrgan-x4plus-anime.onnx` | Real-ESRGAN Anime 6B |
-| `realesr-animevideov3.onnx` | Real-ESRGAN Anime Compact |
+| File name | Model | Size | Source |
+|---|---|---:|---|
+| `realesr-general-x4v3.onnx` | Real-ESRGAN Compact (default, fast) | 4.6 MB | already on dev machine |
+| `realesrgan-x4plus.onnx` | Real-ESRGAN Plus (photo, slow on CPU) | 66 MB | HF `facefusion/models-3.0.0` `real_esrgan_x4.onnx` |
+| `realesrgan-x4plus-anime.onnx` | Real-ESRGAN Anime 6B | 17 MB | HF `deepghs/imgutils-models` |
+| `realesrgan-x4plus-anime-4b32f.onnx` | Real-ESRGAN Anime Light | 4.9 MB | HF `deepghs/imgutils-models` |
+| `det_10g.onnx` | SCRFD face detector | 16 MB | local face_swap projects |
+| `gfpgan_1.4.onnx` | GFPGAN face restorer | 325 MB | local face_swap projects |
 
 `gfpgan_1.4` and `det_10g` are licensed for non-commercial use.
 

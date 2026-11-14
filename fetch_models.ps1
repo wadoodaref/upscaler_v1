@@ -43,23 +43,28 @@ if (-not (Test-Path $destDet)) {
 $targets = @(
     @{
         Name = "realesr-general-x4v3.onnx"
+        Sha256 = "1940a93ee08283a0a7286183186357b1688fe9fa8ede74604b424586aaddf112"
         Urls = @(
-            "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.onnx",
-            "https://huggingface.co/qualcomm/Real-ESRGAN-General-x4v3/resolve/main/realesr-general-x4v3.onnx"
+            "https://huggingface.co/CoderViking/realesr-general-x4v3-onnx/resolve/main/realesr-general-x4v3.onnx"
         )
     },
+    # The three below were downloaded from these URLs and checksum-verified
+    # on 2026-11-14. (The realesr-general-x4v3 URLs above are unverified
+    # leftovers from session 1; that file is already on the dev machine.)
     @{
         Name = "realesrgan-x4plus.onnx"
-        Urls = @(
-            "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/realesrgan-x4plus.onnx",
-            "https://huggingface.co/facefusion/models-3.0.0/resolve/main/realesrgan_x4plus.onnx"
-        )
+        Sha256 = "afa7fa42eed0315a3d7b2a54e79e4e44a672d3c0889c2828c4f84c9ab91edb0b"
+        Urls = @("https://huggingface.co/facefusion/models-3.0.0/resolve/main/real_esrgan_x4.onnx")
     },
     @{
         Name = "realesrgan-x4plus-anime.onnx"
-        Urls = @(
-            "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/realesrgan-x4plus-anime.onnx"
-        )
+        Sha256 = "2648cab4c4343541c1aa291c6754e9e8edbe7a813fffc2a677423dd12cb6b7f7"
+        Urls = @("https://huggingface.co/deepghs/imgutils-models/resolve/main/real_esrgan/RealESRGAN_x4plus_anime_6B.onnx")
+    },
+    @{
+        Name = "realesrgan-x4plus-anime-4b32f.onnx"
+        Sha256 = "2208c7ae8db793330abf1248fbce15585ad317e921c456265572836b92926c9a"
+        Urls = @("https://huggingface.co/deepghs/imgutils-models/resolve/main/real_esrgan/RealESRGAN_x4plus_anime_4B32F.onnx")
     }
 )
 
@@ -88,6 +93,15 @@ foreach ($t in $targets) {
             }
         } catch {
             Write-Host "Download from $url failed: $_" -ForegroundColor DarkYellow
+        }
+    }
+
+    if ($success -and $t.Sha256) {
+        $got = (Get-FileHash $targetPath -Algorithm SHA256).Hash.ToLower()
+        if ($got -ne $t.Sha256) {
+            Write-Host "Checksum mismatch for $($t.Name) - file removed." -ForegroundColor Red
+            Remove-Item $targetPath -Force
+            $success = $false
         }
     }
 

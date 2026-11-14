@@ -86,7 +86,9 @@ New-Item -ItemType Directory -Force -Path (Join-Path $appDir "output") | Out-Nul
 
 if (-not $NoModels) {
     $src = Join-Path $root "models"
-    foreach ($need in @("realesr-general-x4v3.onnx", "gfpgan_1.4.onnx", "det_10g.onnx")) {
+    foreach ($need in @("realesr-general-x4v3.onnx", "realesrgan-x4plus.onnx",
+                        "realesrgan-x4plus-anime.onnx", "realesrgan-x4plus-anime-4b32f.onnx",
+                        "gfpgan_1.4.onnx", "det_10g.onnx")) {
         if (-not (Test-Path (Join-Path $src $need))) {
             Fail "models\$need is missing, so the portable would lack an engine. Run .\fetch_models.ps1, or pass -NoModels on purpose."
         }
@@ -111,8 +113,8 @@ Everything lives in the app\ folder:
   output\    results are written here unless you choose another folder
   settings.json, upscaler.log   created on first run
 
-To add another upscaling model, drop its .onnx file into app\models\ using the
-file name the app expects (see README.md of the project).
+Models: Real-ESRGAN Compact (fast default), Real-ESRGAN Plus (best for photos,
+slower), Anime 6B and Anime Light (drawings), plus two instant "Fast" modes.
 
 gfpgan_1.4 and det_10g are licensed for non-commercial use.
 "@

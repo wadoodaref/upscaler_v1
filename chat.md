@@ -110,3 +110,30 @@ Same request as session 2: make it a portable offline project like face swap.
 ### Commit
 - `d568bfb`
 
+
+## Session 4 — 2026-11-14: Extra ONNX models (Photo & Anime) validated, wired, and portable rebuilt
+
+### User Request
+Find verified ONNX sources for extra models, download and validate them, wire models into registry and fetch script, rebuild and self-test the portable, update docs, log, commit, and push.
+
+### What Was Done
+1. **Source Discovery & Download:**
+   - Downloaded `real_esrgan_x4.onnx` (69.5 MB) from `facefusion/models-3.0.0` on Hugging Face.
+   - Downloaded `RealESRGAN_x4plus_anime_6B.onnx` (17.9 MB) from `deepghs/imgutils-models` on Hugging Face.
+   - Downloaded `RealESRGAN_x4plus_anime_4B32F.onnx` (5.2 MB) from `deepghs/imgutils-models` on Hugging Face.
+2. **Contract & Integrity Verification:**
+   - Checked SHA256 checksums matching known releases.
+   - Verified inputs/outputs in ONNX Runtime (dynamic batch and spatial axes, float32, channels-first).
+   - Confirmed inference output shapes `(1, 3, 256, 256)` on 64x64 test input for all models.
+3. **Session Memory & Stability Fix (`app/core/upscaler.py`):**
+   - Discovered that loading consecutive large models under DirectML without garbage collection caused `887A0006` (GPU device hung / TDR).
+   - Added explicit `del self.onnx_session` and `gc.collect()` in `_get_onnx_session` before allocating new sessions.
+   - Added automatic CPU fallback if DirectML throws any hardware error during inference.
+4. **Model Registry & Fetch Script:**
+   - Updated `app/core/models_registry.py` with alias support, SHA256 checksums, and verified download URLs.
+   - Updated `fetch_models.ps1` with SHA256 verification and automatic clean removal on mismatch.
+   - Updated `README.md` models table with exact file sizes and sources.
+5. **Portable Rebuild & Self-Test:**
+   - Ran `.\build_portable.ps1 -Clean`.
+   - Executable `--selftest` verified all 6 models on both DirectML and CPU (12 test runs) plus face restoration; all passed.
+   - Packaged into `E:\projects\1output\UPSCALER_V1_PORTABLE` (853 MB, launcher: `Upscaler 1.exe`).
