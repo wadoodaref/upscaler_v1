@@ -1,0 +1,33 @@
+# --- environment -----------------------------------------------------------
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# --- model weights ---------------------------------------------------------
+models/*.onnx
+models/*.bin
+models/*.param
+models/*.zip
+*.part
+
+# --- build artifacts -------------------------------------------------------
+dist/
+build/
+*.manifest
+*.zip
+
+# --- runtime output --------------------------------------------------------
+output/
+*.log
+settings.json
+startup_error.log
+
+# --- os / editor -----------------------------------------------------------
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# per-machine local-state manifests (rules v7 section 9)
+GITIGNORED_FILES_*.md

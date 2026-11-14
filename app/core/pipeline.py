@@ -1,0 +1,88 @@
+"""Pipeline managing image IO, upscaling, optional face restoration, and saving."""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable
+
+import cv2
+import numpy as np
+from PIL import Image
+
+from ..util.config import Settings
+from .providers import resolve_onnx_providers
+from .restorer import FaceRestorer
+from .upscaler import UpscalerEngine
+
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class UpscaleJob:
+    input_path: Path
+    output_path: Path
+    status: str = "pending"   # pending, running, completed, error, cancelled
+    message: str = ""
+    original_dims: tuple[int, int] = (0, 0)
+    output_dims: tuple[int, int] = (0, 0)
+    elapsed_seconds: float = 0.0
+
+
+class UpscalePipeline:
+    def __init__(self, settings: Settings, models_dir: Path) -> None:
+        self.settings = settings
+        self.models_dir = models_dir
+        self.engine = UpscalerEngine(models_dir)
+        self.restorer = FaceRestorer(models_dir, resolve_onnx_providers(settings.device))
+
+    def load_image(self, path: Path) -> np.ndarray:
+        # Load through OpenCV with UTF-8/Windows wide-char path safety
+        with open(path, "rb") as f:
+            bytes_data = bytearray(f.read())
+        arr = np.asarray(bytes_data, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError(f"Could not decode image: {path}")
+        return img
+
+    def save_image(self, img_bgr: np.ndarray, out_path: Path, quality: int = 95) -> None:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        ext = out_path.suffix.lower()
+
+        if ext in (".jpg", ".jpeg"):
+            encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+        elif ext == ".webp":
+            encode_params = [int(cv2.IMWRITE_WEBP_QUALITY), quality]
+        else:
+            encode_params = [int(cv2.IMWRITE_PNG_COMPRESSION), 4]
+
+        success, enc = cv2.imencode(ext, img_bgr, encode_params)
+        if not success:
+            raise RuntimeError(f"Failed to encode image to {ext}")
+        with open(out_path, "wb") as f:
+            f.write(enc)
+
+    def process_image(
+        self,
+        image_bgr: np.ndarray,
+        progress_cb: Callable[[int, int], None] | None = None,
+        is_cancelled: Callable[[], bool] | None = None,
+    ) -> np.ndarray:
+        # 1. Upscale
+        result = self.engine.upscale(
+            image=image_bgr,
+            model_id=self.settings.model,
+            engine_type=self.settings.engine,
+            device_pref=self.settings.device,
+            tile_size=self.settings.tile_size,
+            progress_cb=progress_cb,
+            is_cancelled=is_cancelled,
+        )
+
+        # 2. Face restoration pass if enabled
+        if self.settings.face_restoration and self.restorer.is_available:
+            result = self.restorer.enhance_image_faces(result, blend=self.settings.face_restorer_blend)
+
+        return result
