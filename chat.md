@@ -107,3 +107,6 @@ Same request as session 2: make it a portable offline project like face swap.
 - `Upscaler 1.exe` started from the portable: window "Image Upscaler v1 v1.0.0" opened, no `startup_error.log`, closed cleanly.
 - Not done: a click-through upscale in the portable GUI.
 
+### Commit
+- `d568bfb`
+
