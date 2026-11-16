@@ -167,3 +167,6 @@ Find verified ONNX sources for extra models, download and validate them, wire mo
 - Photo and 2x models run through the real pipeline on DirectML without falling back (see timings above).
 - "Auto" device now keeps the small models (Compact, Anime 6B/Light) on CPU: in the packaged self-test they took 11-28 s on DirectML vs 0.4-4.6 s on CPU (DirectML start-up/compile cost). Photo models stay on DirectML (147 s vs 279 s for 640x444 -> 4x).
 - Portable rebuilt and self-tested (all 7 models x auto/CPU + face restorer passed); see final rebuild result below.
+
+### Commit
+- `904f80f`
