@@ -42,10 +42,24 @@ MODELS: list[ModelSpec] = [
         category="photo",
         scale=4,
         engine="onnx",
-        filenames=("real_esrgan_x4.onnx", "realesrgan-x4plus.onnx"),
-        description="Full RRDBNet photo super-resolution (66.3 MB) from FaceFusion / Real-ESRGAN.",
-        sha256="afa7fa42eed0315a3d7b2a54e79e4e44a672d3c0889c2828c4f84c9ab91edb0b",
-        download_url="https://huggingface.co/facefusion/models-3.0.0/resolve/main/real_esrgan_x4.onnx",
+        # fp16 first: same network, visually identical (54 dB PSNR vs fp32), about
+        # 1.8x faster on DirectML and faster on CPU too, half the size. The fp32
+        # names stay as fallbacks for older installs.
+        filenames=("realesrgan-x4plus-fp16.onnx", "realesrgan-x4plus.onnx", "real_esrgan_x4.onnx"),
+        description="Best quality for photos (4x). RRDBNet, fp16 (34 MB). Slow: use on a GPU or be patient.",
+        sha256="223c117884ed92526ba1f89fbc09c663f15786c1049802c1a0ac8895b09a9cbc",
+        download_url="https://huggingface.co/facefusion/models-3.0.0/resolve/main/real_esrgan_x4_fp16.onnx",
+    ),
+    ModelSpec(
+        id="realesrgan-x2plus",
+        name="Real-ESRGAN Plus 2x (Photo)",
+        category="photo",
+        scale=2,
+        engine="onnx",
+        filenames=("realesrgan-x2plus-fp16.onnx", "real_esrgan_x2_fp16.onnx"),
+        description="Best quality for photos at 2x, about 4x faster than the 4x model (fp16, 34 MB).",
+        sha256="0218a7177bccafaad11bcee4fcb3aa42a74c8551da195eede6c62645fa8bdcc7",
+        download_url="https://huggingface.co/facefusion/models-3.0.0/resolve/main/real_esrgan_x2_fp16.onnx",
     ),
     ModelSpec(
         id="realesrgan-x4plus-anime-6b",

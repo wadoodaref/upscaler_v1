@@ -86,8 +86,8 @@ New-Item -ItemType Directory -Force -Path (Join-Path $appDir "output") | Out-Nul
 
 if (-not $NoModels) {
     $src = Join-Path $root "models"
-    foreach ($need in @("realesr-general-x4v3.onnx", "realesrgan-x4plus.onnx",
-                        "realesrgan-x4plus-anime.onnx", "realesrgan-x4plus-anime-4b32f.onnx",
+    foreach ($need in @("realesr-general-x4v3.onnx", "realesrgan-x4plus-fp16.onnx",
+                        "realesrgan-x2plus-fp16.onnx", "realesrgan-x4plus-anime.onnx", "realesrgan-x4plus-anime-4b32f.onnx",
                         "gfpgan_1.4.onnx", "det_10g.onnx")) {
         if (-not (Test-Path (Join-Path $src $need))) {
             Fail "models\$need is missing, so the portable would lack an engine. Run .\fetch_models.ps1, or pass -NoModels on purpose."

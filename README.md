@@ -55,13 +55,20 @@ fails if that does not pass. A rebuild keeps `app\settings.json` and `app\output
 ### 4. Models
 All of these are bundled and required by the build. The two "Fast" modes need
 no model. The app lists only models whose file is present in `models\`.
-`.\fetch_models.ps1` downloads the three Real-ESRGAN Plus/Anime files and
+`.\fetch_models.ps1` downloads the Real-ESRGAN Plus/Anime files and
 checks their SHA-256.
+
+**Best quality** for photos is Real-ESRGAN Plus (4x, or the dedicated 2x model,
+which the app picks automatically when you ask for 2x) with Face Restoration on.
+The Photo models are fp16: visually identical to fp32 (54 dB PSNR) but about
+1.8x faster and half the size. On a GPU (DirectML) they are 2-3x faster than on
+CPU; the small models (Compact, Anime Light) run equally well on either.
 
 | File name | Model | Size | Source |
 |---|---|---:|---|
 | `realesr-general-x4v3.onnx` | Real-ESRGAN Compact (default, fast) | 4.6 MB | already on dev machine |
-| `realesrgan-x4plus.onnx` | Real-ESRGAN Plus (photo, slow on CPU) | 66 MB | HF `facefusion/models-3.0.0` `real_esrgan_x4.onnx` |
+| `realesrgan-x4plus-fp16.onnx` | Real-ESRGAN Plus 4x (photo, best quality) | 35 MB | HF `facefusion/models-3.0.0` `real_esrgan_x4_fp16.onnx` |
+| `realesrgan-x2plus-fp16.onnx` | Real-ESRGAN Plus 2x (photo, about 4x faster than 4x) | 35 MB | HF `facefusion/models-3.0.0` `real_esrgan_x2_fp16.onnx` |
 | `realesrgan-x4plus-anime.onnx` | Real-ESRGAN Anime 6B | 17 MB | HF `deepghs/imgutils-models` |
 | `realesrgan-x4plus-anime-4b32f.onnx` | Real-ESRGAN Anime Light | 4.9 MB | HF `deepghs/imgutils-models` |
 | `det_10g.onnx` | SCRFD face detector | 16 MB | local face_swap projects |

@@ -60,6 +60,28 @@ def upscale_algorithmic(
     return enhanced
 
 
+def _cpu_threads() -> int:
+    """Physical-core count (hyper-threads hurt ONNX Runtime's matrix kernels)."""
+    logical = os.cpu_count() or 4
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        size = wintypes.DWORD(0)
+        ctypes.windll.kernel32.GetLogicalProcessorInformationEx(0, None, ctypes.byref(size))  # 0 = RelationProcessorCore
+        buf = ctypes.create_string_buffer(size.value)
+        if ctypes.windll.kernel32.GetLogicalProcessorInformationEx(0, buf, ctypes.byref(size)):
+            off = cores = 0
+            while off < size.value:
+                cores += 1
+                off += int.from_bytes(buf.raw[off + 4:off + 8], "little")   # record Size field
+            if 0 < cores <= logical:
+                return cores
+    except Exception:                                              # noqa: BLE001
+        pass
+    return max(1, logical // 2) if logical >= 4 else logical
+
+
 class UpscalerEngine:
     def __init__(self, models_dir: Path) -> None:
         self.models_dir = models_dir
@@ -75,6 +97,12 @@ class UpscalerEngine:
                 f"Please place the model in the models/ directory or choose Fast Algorithmic mode."
             )
 
+        # "Auto": only the heavy Photo networks gain from the GPU (2-3x). The
+        # small models run as fast on CPU, and DirectML adds 10-25 s of start-up
+        # and kernel compilation per model, so they stay on CPU unless the user
+        # picks a GPU explicitly.
+        if device_pref == "auto" and model_spec.category != "photo":
+            device_pref = "cpu"
         providers = resolve_onnx_providers(device_pref)
         active_provider = providers[0]
 
@@ -96,10 +124,24 @@ class UpscalerEngine:
 
         sess_opts = ort.SessionOptions()
         sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        sess_opts.intra_op_num_threads = max(1, os.cpu_count() or 4)
+        sess_opts.log_severity_level = 3
+        if providers[0] == "DmlExecutionProvider":
+            # DirectML does not support the memory-pattern optimisation and
+            # hangs the GPU (887A0006) under parallel execution. This was the
+            # cause of the DirectML "device hung" errors on this machine.
+            sess_opts.enable_mem_pattern = False
+            sess_opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        else:
+            # Measured on a 4-core/8-thread CPU: physical cores beat all
+            # logical threads (7.8 s vs 9.9 s per tile).
+            sess_opts.intra_op_num_threads = _cpu_threads()
 
         log.info("Loading ONNX model '%s' with providers: %s", model_spec.id, providers)
-        session = ort.InferenceSession(str(target_path), sess_options=sess_opts, providers=providers)
+        # An explicit device_id matters: without it DirectML picked a state
+        # that hung on the Photo model, with it the same model runs cleanly.
+        prov_opts = [{"device_id": 0} if p == "DmlExecutionProvider" else {} for p in providers]
+        session = ort.InferenceSession(str(target_path), sess_options=sess_opts,
+                                       providers=providers, provider_options=prov_opts)
         self.onnx_session = session
         self.current_onnx_model = model_spec.id
         self.current_provider = session.get_providers()[0]
@@ -120,7 +162,9 @@ class UpscalerEngine:
 
         def forward_tile(tile_bgr: np.ndarray) -> np.ndarray:
             rgb = cv2.cvtColor(tile_bgr, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
-            tensor = np.transpose(rgb, (2, 0, 1))[np.newaxis, ...]  # 1, C, H, W
+            # Contiguous copy: a strided view of the transpose is what made
+            # DirectML hang the GPU (887A0006) on the second tile.
+            tensor = np.ascontiguousarray(np.transpose(rgb, (2, 0, 1))[np.newaxis, ...])  # 1, C, H, W
             out = session.run(None, {input_name: tensor})[0][0]
             out = np.clip(np.transpose(out, (1, 2, 0)), 0, 1.0) * 255.0
             return cv2.cvtColor(out.astype(np.uint8), cv2.COLOR_RGB2BGR)
@@ -130,10 +174,11 @@ class UpscalerEngine:
             img=image,
             scale=scale,
             tile_size=tile_size,
-            tile_pad=16,
+            tile_pad=10,           # Real-ESRGAN's own default; 16 cost ~10% more compute per tile
             forward_fn=forward_tile,
             progress_callback=progress_cb,
             is_cancelled=is_cancelled,
+            fixed_shape=(self.current_provider == "DmlExecutionProvider"),
         )
 
     def upscale_onnx(

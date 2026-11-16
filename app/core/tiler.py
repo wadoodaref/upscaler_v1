@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 from typing import Callable
+
+import cv2
 import numpy as np
 
 
@@ -15,6 +17,7 @@ def process_tiles(
     forward_fn: Callable[[np.ndarray], np.ndarray],
     progress_callback: Callable[[int, int], None] | None = None,
     is_cancelled: Callable[[], bool] | None = None,
+    fixed_shape: bool = False,
 ) -> np.ndarray:
     """Split img (H, W, C) into overlapping tiles, process each through forward_fn,
     and blend back seamlessly with linear ramp weighting.
@@ -58,9 +61,22 @@ def process_tiles(
             pad_y_end = min(h, y_end + tile_pad)
 
             tile_in = img[pad_y_start:pad_y_end, pad_x_start:pad_x_end]
+            real_h, real_w = tile_in.shape[:2]
+
+            if fixed_shape:
+                # DirectML recompiles its GPU kernels for every new input shape
+                # (7-15 s each on the Photo model). Feeding every tile the same
+                # size compiles once; the added border is cropped off the output.
+                full = tile_size + 2 * tile_pad
+                bh, bw = full - real_h, full - real_w
+                if bh or bw:
+                    mode = cv2.BORDER_REFLECT_101 if (bh < real_h and bw < real_w) else cv2.BORDER_REPLICATE
+                    tile_in = cv2.copyMakeBorder(tile_in, 0, bh, 0, bw, mode)
 
             # Forward through engine
             tile_out = forward_fn(tile_in).astype(np.float32)
+            if fixed_shape:
+                tile_out = tile_out[: real_h * scale, : real_w * scale]
 
             # Output coordinates
             out_pad_x_start = pad_x_start * scale

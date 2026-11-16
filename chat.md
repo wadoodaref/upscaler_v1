@@ -140,3 +140,30 @@ Find verified ONNX sources for extra models, download and validate them, wire mo
 
 ### Commit
 - `bfb20ae`
+
+## Session 5 — 2026-11-14/16: Best quality + speed (fp16 Photo models, DirectML fixes)
+
+### User Request
+"proceed for best quality and improve time, create portable"
+
+### Measured on this PC (i7-8565U 4c/8t, MX130, 8 GB)
+- Photo model per 144 px tile: CPU fp32 7.8 s, DirectML fp32 7.1 s, DirectML fp16 4.5 s, CPU fp16 6.9 s. fp16 vs fp32 output: 54.3 dB PSNR (visually identical).
+- CPU threads: 4 (physical cores) 7.8 s beats 8 (logical) 9.9 s.
+- GFPGAN per face: CPU 3.3 s, DirectML 4.0 s -> restorer runs on CPU under "auto".
+- Compact / Anime Light / Anime 6B: CPU about equal to DirectML -> "auto" unchanged.
+- Dedicated 2x fp16 Photo model: 3.8 s per 272 px tile vs about 16 s for the 4x one.
+- Running DirectML and CPU on different tiles at once: only +18% (they fight for CPU); not implemented.
+- 640x444 -> 4x Photo, full pipeline: DirectML 147 s (first) / 104 s (next image); CPU 279 s / 273 s.
+
+### Changes
+- `models_registry.py`: Photo 4x now uses `realesrgan-x4plus-fp16.onnx` (fp32 names kept as fallbacks); new `realesrgan-x2plus` (2x, fp16). SHA-256 + URLs verified.
+- `pipeline.py`: a 2x request on the 4x Photo model switches to the 2x model; output is resized to the requested scale in both directions; GFPGAN on CPU under auto.
+- `upscaler.py`: DirectML sessions now set `enable_mem_pattern=False`, sequential execution and an explicit `device_id` (without these the Photo model hung the GPU, 887A0006, and silently fell back to CPU); CPU sessions use physical-core thread count; contiguous input tensors; tile pad 16 -> 10; DirectML tiles are fixed-shape.
+- `tiler.py`: `fixed_shape` option. DirectML recompiles kernels for each new input shape (7-25 s each), so edge tiles are border-padded to one size and cropped after.
+- `fetch_models.ps1`, `build_portable.ps1`, `README.md`: new model files.
+- Removed the fp32 Photo model from the bundle (saves 33 MB net with the new fp16 pair).
+
+### Verification
+- Photo and 2x models run through the real pipeline on DirectML without falling back (see timings above).
+- "Auto" device now keeps the small models (Compact, Anime 6B/Light) on CPU: in the packaged self-test they took 11-28 s on DirectML vs 0.4-4.6 s on CPU (DirectML start-up/compile cost). Photo models stay on DirectML (147 s vs 279 s for 640x444 -> 4x).
+- Portable rebuilt and self-tested (all 7 models x auto/CPU + face restorer passed); see final rebuild result below.

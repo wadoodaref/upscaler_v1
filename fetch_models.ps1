@@ -52,9 +52,14 @@ $targets = @(
     # on 2026-11-14. (The realesr-general-x4v3 URLs above are unverified
     # leftovers from session 1; that file is already on the dev machine.)
     @{
-        Name = "realesrgan-x4plus.onnx"
-        Sha256 = "afa7fa42eed0315a3d7b2a54e79e4e44a672d3c0889c2828c4f84c9ab91edb0b"
-        Urls = @("https://huggingface.co/facefusion/models-3.0.0/resolve/main/real_esrgan_x4.onnx")
+        Name = "realesrgan-x4plus-fp16.onnx"
+        Sha256 = "223c117884ed92526ba1f89fbc09c663f15786c1049802c1a0ac8895b09a9cbc"
+        Urls = @("https://huggingface.co/facefusion/models-3.0.0/resolve/main/real_esrgan_x4_fp16.onnx")
+    },
+    @{
+        Name = "realesrgan-x2plus-fp16.onnx"
+        Sha256 = "0218a7177bccafaad11bcee4fcb3aa42a74c8551da195eede6c62645fa8bdcc7"
+        Urls = @("https://huggingface.co/facefusion/models-3.0.0/resolve/main/real_esrgan_x2_fp16.onnx")
     },
     @{
         Name = "realesrgan-x4plus-anime.onnx"

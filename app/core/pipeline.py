@@ -12,6 +12,7 @@ import numpy as np
 from PIL import Image
 
 from ..util.config import Settings
+from .models_registry import get_model, is_model_installed
 from .providers import resolve_onnx_providers
 from .restorer import FaceRestorer
 from .upscaler import UpscalerEngine
@@ -35,7 +36,10 @@ class UpscalePipeline:
         self.settings = settings
         self.models_dir = models_dir
         self.engine = UpscalerEngine(models_dir)
-        self.restorer = FaceRestorer(models_dir, resolve_onnx_providers(settings.device))
+        # GFPGAN measured faster on CPU than on DirectML here (3.3 s vs 4.0 s per
+        # face) and CPU leaves the GPU free; honour an explicit GPU choice only.
+        restore_dev = "cpu" if settings.device in ("auto", "cpu") else settings.device
+        self.restorer = FaceRestorer(models_dir, resolve_onnx_providers(restore_dev))
 
     def load_image(self, path: Path) -> np.ndarray:
         # Load through OpenCV with UTF-8/Windows wide-char path safety
@@ -70,10 +74,16 @@ class UpscalePipeline:
         progress_cb: Callable[[int, int], None] | None = None,
         is_cancelled: Callable[[], bool] | None = None,
     ) -> np.ndarray:
-        # 1. Upscale
+        # 1. Upscale. A 2x request on the 4x Photo model would compute 4x and
+        # throw 3/4 of it away; use the dedicated 2x network when it is installed.
+        model_id = self.settings.model
+        if self.settings.scale == 2 and model_id == "realesrgan-x4plus":
+            alt = get_model("realesrgan-x2plus")
+            if alt.id == "realesrgan-x2plus" and is_model_installed(alt, self.models_dir):
+                model_id = alt.id
         result = self.engine.upscale(
             image=image_bgr,
-            model_id=self.settings.model,
+            model_id=model_id,
             engine_type=self.settings.engine,
             device_pref=self.settings.device,
             tile_size=self.settings.tile_size,
@@ -85,8 +95,10 @@ class UpscalePipeline:
         # smaller factor, reduce the result so the size matches the request.
         in_h, in_w = image_bgr.shape[:2]
         want_w, want_h = in_w * self.settings.scale, in_h * self.settings.scale
-        if self.settings.scale in (2, 3, 4) and result.shape[1] > want_w:
-            result = cv2.resize(result, (want_w, want_h), interpolation=cv2.INTER_AREA)
+        if self.settings.scale in (2, 3, 4) and result.shape[1] != want_w:
+            shrinking = result.shape[1] > want_w
+            result = cv2.resize(result, (want_w, want_h),
+                                interpolation=cv2.INTER_AREA if shrinking else cv2.INTER_LANCZOS4)
 
         # 2. Face restoration pass if enabled
         if self.settings.face_restoration and self.restorer.is_available:
