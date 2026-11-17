@@ -102,7 +102,8 @@ class UpscaleWorker(QThread):
                 job.output_dims = (rw, rh)
 
                 # Save to disk
-                self.pipeline.save_image(result_bgr, job.output_path, quality=self.pipeline.settings.jpg_quality)
+                self.pipeline.save_image(result_bgr, job.output_path, quality=self.pipeline.settings.jpg_quality,
+                                         source_path=job.input_path)
                 job.elapsed_seconds = time.time() - start_t
                 job.status = "Done"
 
@@ -124,7 +125,7 @@ class UpscaleWorker(QThread):
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
+        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")   # "Image Upscaler v1.0.0"
         self.resize(1280, 820)
         self.setStyleSheet(theme.STYLESHEET)
 
@@ -287,6 +288,11 @@ class MainWindow(QMainWindow):
         out_form.addRow("Quality:", q_row)
         l_out.addLayout(out_form)
 
+        self.chk_exif = QCheckBox("Keep photo info (EXIF, colour profile)")
+        self.chk_exif.setChecked(self.settings.preserve_exif)
+        self.chk_exif.toggled.connect(self._on_exif_toggled)
+        l_out.addWidget(self.chk_exif)
+
         # Output folder row
         dir_row = QHBoxLayout()
         self.txt_out_dir = QLineEdit(self.settings.output_dir)
@@ -413,6 +419,10 @@ class MainWindow(QMainWindow):
 
     def _on_face_restore_toggled(self, checked: bool) -> None:
         self.settings.face_restoration = checked
+        self.settings.save()
+
+    def _on_exif_toggled(self, checked: bool) -> None:
+        self.settings.preserve_exif = checked
         self.settings.save()
 
     def _on_format_changed(self, idx: int) -> None:

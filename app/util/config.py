@@ -10,7 +10,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-APP_NAME = "Image Upscaler v1"
+APP_NAME = "Image Upscaler"
 APP_VERSION = "1.0.0"
 
 

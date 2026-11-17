@@ -51,9 +51,51 @@ class UpscalePipeline:
             raise ValueError(f"Could not decode image: {path}")
         return img
 
-    def save_image(self, img_bgr: np.ndarray, out_path: Path, quality: int = 95) -> None:
+    @staticmethod
+    def read_metadata(path: Path) -> tuple[bytes | None, bytes | None]:
+        """EXIF and ICC profile of the source, or (None, None).
+
+        cv2 applies the EXIF orientation while decoding, so the pixels are
+        already upright; the copied EXIF gets Orientation=1 to avoid a second
+        rotation in viewers.
+        """
+        try:
+            with Image.open(path) as im:
+                exif = im.getexif()
+                icc = im.info.get("icc_profile")
+                if not exif and not icc:
+                    return None, None
+                if 0x0112 in exif:
+                    exif[0x0112] = 1
+                return (exif.tobytes() if exif else None), icc
+        except Exception as e:                                     # noqa: BLE001
+            log.debug("No metadata read from %s: %s", path, e)
+            return None, None
+
+    def save_image(self, img_bgr: np.ndarray, out_path: Path, quality: int = 95,
+                   source_path: Path | None = None) -> None:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         ext = out_path.suffix.lower()
+
+        # Keep the photo's camera data / colour profile when asked to.
+        if self.settings.preserve_exif and source_path is not None:
+            exif, icc = self.read_metadata(source_path)
+            if exif or icc:
+                rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+                kwargs: dict = {}
+                if exif:
+                    kwargs["exif"] = exif
+                if icc:
+                    kwargs["icc_profile"] = icc
+                if ext in (".jpg", ".jpeg"):
+                    kwargs.update(quality=quality, subsampling=0)
+                elif ext == ".webp":
+                    kwargs.update(quality=quality)
+                try:
+                    Image.fromarray(rgb).save(out_path, **kwargs)
+                    return
+                except Exception as e:                             # noqa: BLE001
+                    log.warning("Saving with metadata failed (%s); saving without it", e)
 
         if ext in (".jpg", ".jpeg"):
             encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
